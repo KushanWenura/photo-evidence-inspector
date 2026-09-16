@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="Inspect a photo's embedded capture date, GPS coordinates, camera or phone model, and technical details without uploading the image."
+      content="Inspect embedded photo metadata locally and optionally estimate a broad location from visible clues using a reduced, metadata-free image."
     />
     <meta name="theme-color" content="#07111c" />
     <title>Photo Evidence Inspector</title>
@@ -33,9 +33,9 @@
           <strong>Inspector</strong>
         </span>
       </a>
-      <div class="privacy-lock" title="Photo analysis runs in this browser">
+      <div class="privacy-lock" title="Metadata stays local; AI analysis is optional">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10V7a5 5 0 0 1 10 0v3M6 10h12v10H6z"></path></svg>
-        <span>On-device analysis</span>
+        <span>Local by default</span>
       </div>
     </header>
 
@@ -45,7 +45,7 @@
           <p class="section-kicker"><span></span> PRIVATE PHOTO CHECK</p>
           <h1 id="page-title">What does this photo reveal?</h1>
           <p class="lede">
-            Check the embedded date, location, phone or camera model, and technical details. Your photo never leaves this device.
+            Check embedded date, exact GPS, phone or camera model, and technical details locally. If those were removed, you can optionally request an AI estimate from visible clues.
           </p>
         </div>
 
@@ -72,11 +72,11 @@
 
         <div class="privacy-note">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 12 3 3 7-7"></path><circle cx="12" cy="12" r="9"></circle></svg>
-          <p><strong>No upload.</strong> The file is read locally in your browser and is not stored by this site.</p>
+          <p><strong>Local by default.</strong> Metadata inspection never uploads the original. Optional AI analysis sends only a resized, metadata-free JPEG after you press the AI button; this app does not store it.</p>
         </div>
 
         <div class="signal-list" aria-label="Information this tool can inspect">
-          <span>CAPTURE TIME</span><span>GPS</span><span>DEVICE</span><span>IMAGE DATA</span>
+          <span>CAPTURE TIME</span><span>GPS</span><span>DEVICE</span><span>IMAGE DATA</span><span>VISUAL CLUES</span>
         </div>
       </section>
 
@@ -134,7 +134,7 @@
 
     <footer class="site-footer">
       <p><strong>Important:</strong> Metadata is a clue, not proof. It can be removed or changed, and many messaging apps strip it automatically.</p>
-      <span>PHOTO EVIDENCE INSPECTOR · LOCAL MODE</span>
+      <span>LOCAL METADATA · OPT-IN AI ESTIMATE</span>
     </footer>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
