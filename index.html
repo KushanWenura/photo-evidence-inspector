@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Inspect a photo's embedded capture date, GPS coordinates, camera or phone model, and technical details without uploading the image."
+    />
+    <meta name="theme-color" content="#07111c" />
+    <title>Photo Evidence Inspector</title>
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2307111c'/%3E%3Ccircle cx='14' cy='14' r='7' fill='none' stroke='%2372e7da' stroke-width='3'/%3E%3Cpath d='M19 19l7 7' stroke='%23ffb762' stroke-width='3' stroke-linecap='round'/%3E%3Ccircle cx='14' cy='14' r='2' fill='%23f4f7fb'/%3E%3C/svg%3E"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#workspace">Skip to photo inspector</a>
+
+    <header class="site-header">
+      <a class="brand" href="#" aria-label="Photo Evidence Inspector home">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 40 40" role="img">
+            <circle cx="17" cy="17" r="8.5"></circle>
+            <path d="m23 23 9 9"></path>
+            <path class="brand-reticle" d="M17 11v12M11 17h12"></path>
+          </svg>
+        </span>
+        <span>
+          <span class="eyebrow">PHOTO EVIDENCE</span>
+          <strong>Inspector</strong>
+        </span>
+      </a>
+      <div class="privacy-lock" title="Photo analysis runs in this browser">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10V7a5 5 0 0 1 10 0v3M6 10h12v10H6z"></path></svg>
+        <span>On-device analysis</span>
+      </div>
+    </header>
+
+    <main id="workspace" class="workspace">
+      <section class="intake-panel" aria-labelledby="page-title">
+        <div class="intro-copy">
+          <p class="section-kicker"><span></span> PRIVATE PHOTO CHECK</p>
+          <h1 id="page-title">What does this photo reveal?</h1>
+          <p class="lede">
+            Check the embedded date, location, phone or camera model, and technical details. Your photo never leaves this device.
+          </p>
+        </div>
+
+        <div id="dropZone" class="drop-zone" tabindex="0" role="button" aria-describedby="upload-help">
+          <input
+            id="fileInput"
+            type="file"
+            accept="image/*,.heic,.heif,.tif,.tiff,.webp"
+            aria-label="Choose a photo to inspect"
+          />
+          <div class="scanner-corners" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+          <div class="upload-icon" aria-hidden="true">
+            <svg viewBox="0 0 64 64">
+              <path d="M15 18h11l4-5h9l4 5h6a7 7 0 0 1 7 7v22a7 7 0 0 1-7 7H15a7 7 0 0 1-7-7V25a7 7 0 0 1 7-7Z"></path>
+              <circle cx="32" cy="35" r="11"></circle>
+              <path d="M32 29v12M26 35h12"></path>
+            </svg>
+          </div>
+          <p class="drop-title">Drop a photo here</p>
+          <p id="upload-help" class="drop-help">or choose one from your device</p>
+          <button id="browseBtn" class="primary-button" type="button">Choose photo</button>
+          <p class="format-note">JPG, PNG, WebP, TIFF or HEIC · up to 100 MB</p>
+        </div>
+
+        <div class="privacy-note">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 12 3 3 7-7"></path><circle cx="12" cy="12" r="9"></circle></svg>
+          <p><strong>No upload.</strong> The file is read locally in your browser and is not stored by this site.</p>
+        </div>
+
+        <div class="signal-list" aria-label="Information this tool can inspect">
+          <span>CAPTURE TIME</span><span>GPS</span><span>DEVICE</span><span>IMAGE DATA</span>
+        </div>
+      </section>
+
+      <section id="reportPanel" class="report-panel" aria-labelledby="report-title" aria-live="polite">
+        <div class="report-header">
+          <div>
+            <p class="section-kicker"><span></span> EVIDENCE REPORT</p>
+            <h2 id="report-title">Photo details</h2>
+          </div>
+          <div id="reportActions" class="report-actions" hidden>
+            <button id="copyBtn" class="icon-button" type="button" title="Copy report" aria-label="Copy report">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2"></rect><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"></path></svg>
+            </button>
+            <button id="exportBtn" class="icon-button" type="button" title="Download JSON report" aria-label="Download JSON report">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 5-5m-5 5-5-5M5 20h14"></path></svg>
+            </button>
+            <button id="clearBtn" class="text-button" type="button">Clear</button>
+          </div>
+        </div>
+
+        <div id="emptyState" class="empty-state">
+          <div class="empty-visual" aria-hidden="true">
+            <div class="scan-grid"></div>
+            <svg viewBox="0 0 110 110">
+              <path d="M28 32h19l6-7h16l6 7h10a10 10 0 0 1 10 10v36a10 10 0 0 1-10 10H28a10 10 0 0 1-10-10V42a10 10 0 0 1 10-10Z"></path>
+              <circle cx="57" cy="59" r="17"></circle>
+              <path d="M57 48v22M46 59h22"></path>
+            </svg>
+          </div>
+          <h3>No photo selected</h3>
+          <p>Choose an image to create a local evidence report.</p>
+          <div class="placeholder-cards" aria-hidden="true">
+            <div><span>01</span><i></i><i></i></div>
+            <div><span>02</span><i></i><i></i></div>
+            <div><span>03</span><i></i><i></i></div>
+          </div>
+        </div>
+
+        <div id="loadingState" class="loading-state" hidden>
+          <div class="loader" aria-hidden="true"><span></span><span></span><span></span></div>
+          <h3>Reading photo evidence</h3>
+          <p>Checking image structure and embedded metadata…</p>
+        </div>
+
+        <div id="errorState" class="error-state" hidden>
+          <div class="error-mark" aria-hidden="true">!</div>
+          <h3>That file could not be inspected</h3>
+          <p id="errorMessage">Try another photo file.</p>
+          <button id="tryAgainBtn" class="secondary-button" type="button">Choose another</button>
+        </div>
+
+        <div id="resultState" class="result-state" hidden></div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p><strong>Important:</strong> Metadata is a clue, not proof. It can be removed or changed, and many messaging apps strip it automatically.</p>
+      <span>PHOTO EVIDENCE INSPECTOR · LOCAL MODE</span>
+    </footer>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="./app.js" defer></script>
+  </body>
+</html>
