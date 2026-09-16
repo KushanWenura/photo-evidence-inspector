@@ -645,6 +645,7 @@
         cleanup = () => source.close?.();
       } else {
         const objectUrl = URL.createObjectURL(file);
+        cleanup = () => URL.revokeObjectURL(objectUrl);
         source = await new Promise((resolve, reject) => {
           const image = new Image();
           image.onload = () => resolve(image);
@@ -685,6 +686,8 @@
 
   async function analyzeVisualLocation() {
     if (!currentFile || !currentReport) return;
+    const requestReport = currentReport;
+    const requestFile = currentFile;
     const button = document.getElementById("aiLocationBtn");
     const output = document.getElementById("aiLocationResult");
     if (!button || !output) return;
@@ -694,7 +697,7 @@
     output.className = "ai-location-result is-loading";
     output.textContent = "Creating a smaller JPEG and removing the original metadata…";
     try {
-      const image = await prepareAiImage(currentFile);
+      const image = await prepareAiImage(requestFile);
       button.textContent = "ANALYZING VISIBLE CLUES…";
       output.textContent = "The reduced copy is being analyzed. This can take up to a minute…";
       const controller = new AbortController();
@@ -705,10 +708,12 @@
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || "Visual analysis is unavailable.");
       if (!payload.result) throw new Error("The AI service returned no location result.");
-      currentReport.visualLocation = payload.result;
+      if (currentReport !== requestReport) return;
+      requestReport.visualLocation = payload.result;
       renderAiLocationResult(payload.result);
       button.textContent = "ANALYZE AGAIN";
     } catch (error) {
+      if (currentReport !== requestReport) return;
       output.hidden = false;
       output.className = "ai-location-result is-error";
       output.textContent = error?.name === "AbortError" ? "The visual analysis timed out. Please try again." : (error instanceof Error ? error.message : "Visual analysis failed. Please try again.");
