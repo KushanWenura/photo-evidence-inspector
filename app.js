@@ -2,6 +2,7 @@
   "use strict";
 
   const MAX_FILE_SIZE = 100 * 1024 * 1024;
+  const AI_ENDPOINT = "https://photo-evidence-location-ai.edia--nfo.workers.dev/analyze";
   const els = {
     dropZone: document.getElementById("dropZone"),
     fileInput: document.getElementById("fileInput"),
@@ -20,6 +21,7 @@
   };
 
   let currentReport = null;
+  let currentFile = null;
   let currentObjectUrl = null;
   let toastTimer = null;
 
@@ -575,6 +577,14 @@
         ${evidenceCard("03", "CAM", "Phone or camera", capture.device, capture.device ? "Embedded manufacturer / model" : "Device identity was not included")}
       </div>
 
+      <section class="ai-location-card" aria-labelledby="ai-location-title">
+        <div class="ai-location-heading"><div><span class="ai-kicker">OPTIONAL · VISUAL ANALYSIS</span><h3 id="ai-location-title">Estimate location from visible clues</h3></div><span class="ai-badge">AI ESTIMATE</span></div>
+        <p class="ai-location-copy">If GPS was removed, AI can examine public landmarks, signs, language, roads, architecture and scenery. It cannot recover deleted GPS or reliably identify a phone model from pixels.</p>
+        <div class="ai-privacy"><strong>Your choice:</strong> Clicking the button sends a resized, metadata-free JPEG to Cloudflare Workers AI. This app does not store the photo.</div>
+        <button id="aiLocationBtn" class="secondary-button ai-location-button" type="button">Estimate from visible clues</button>
+        <div id="aiLocationResult" class="ai-location-result" hidden></div>
+      </section>
+
       <div class="detail-section">
         <details open>
           <summary>File and image details</summary>
@@ -593,6 +603,7 @@
       <div class="integrity-note"><span aria-hidden="true">⚠</span><span><strong>Do not treat this as proof.</strong> Embedded metadata can be changed. Compare it with the visible image, message history, and original source when accuracy matters.</span></div>`;
 
     document.getElementById("lookupPlaceBtn")?.addEventListener("click", lookupPlaceName);
+    document.getElementById("aiLocationBtn")?.addEventListener("click", analyzeVisualLocation);
     const preview = els.result.querySelector(".photo-preview img");
     if (preview) preview.addEventListener("error", () => {
       preview.parentElement.innerHTML = '<span class="preview-fallback">PREVIEW<br>UNAVAILABLE</span>';
@@ -625,6 +636,86 @@
     }
   }
 
+  async function prepareAiImage(file) {
+    let source;
+    let cleanup = () => {};
+    try {
+      if ("createImageBitmap" in window) {
+        source = await createImageBitmap(file);
+        cleanup = () => source.close?.();
+      } else {
+        const objectUrl = URL.createObjectURL(file);
+        source = await new Promise((resolve, reject) => {
+          const image = new Image();
+          image.onload = () => resolve(image);
+          image.onerror = () => reject(new Error("This browser cannot decode the photo for visual analysis."));
+          image.src = objectUrl;
+        });
+        cleanup = () => URL.revokeObjectURL(objectUrl);
+      }
+      const sourceWidth = source.width || source.naturalWidth;
+      const sourceHeight = source.height || source.naturalHeight;
+      if (!sourceWidth || !sourceHeight) throw new Error("The photo dimensions could not be decoded.");
+      const scale = Math.min(1, 1400 / Math.max(sourceWidth, sourceHeight));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(sourceWidth * scale));
+      canvas.height = Math.max(1, Math.round(sourceHeight * scale));
+      const context = canvas.getContext("2d", { alpha: false });
+      if (!context) throw new Error("The browser could not prepare the reduced image.");
+      context.fillStyle = "#ffffff";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(source, 0, 0, canvas.width, canvas.height);
+      return canvas.toDataURL("image/jpeg", 0.78);
+    } finally { cleanup(); }
+  }
+
+  function renderAiLocationResult(result) {
+    const output = document.getElementById("aiLocationResult");
+    if (!output) return;
+    const placeParts = [result.likelyPlace, result.region, result.country].filter((value, index, items) => value && value !== "Unknown" && items.indexOf(value) === index);
+    const place = placeParts.join(", ") || "Unable to estimate";
+    const confidence = ["high", "medium", "low", "none"].includes(result.confidence) ? result.confidence : "low";
+    const clues = Array.isArray(result.clues) && result.clues.length ? `<ul>${result.clues.map((clue) => `<li>${escapeHtml(clue)}</li>`).join("")}</ul>` : "<p>No reliable geographic clues were found.</p>";
+    const alternatives = Array.isArray(result.alternatives) && result.alternatives.length ? `<div class="ai-alternatives"><strong>Other possibilities</strong>${result.alternatives.map((item) => `<p><span>${escapeHtml(item.place)}</span>${escapeHtml(item.reason)}</p>`).join("")}</div>` : "";
+    const mapLink = result.mapQuery ? `<a class="mini-action" href="https://www.openstreetmap.org/search?query=${encodeURIComponent(result.mapQuery)}" target="_blank" rel="noopener noreferrer">SEARCH THIS AREA</a>` : "";
+    output.hidden = false;
+    output.className = "ai-location-result";
+    output.innerHTML = `<div class="ai-result-top"><div><span>LIKELY AREA</span><strong>${escapeHtml(place)}</strong></div><span class="confidence confidence-${escapeHtml(confidence)}">${escapeHtml(confidence.toUpperCase())} CONFIDENCE</span></div><p class="ai-summary">${escapeHtml(result.summary)}</p><div class="ai-clues"><strong>Visible clues used</strong>${clues}</div>${alternatives}<div class="ai-result-actions">${mapLink}</div><p class="ai-limitation"><strong>Limitation:</strong> ${escapeHtml(result.limitations || "Visual geolocation is an estimate and may be wrong.")}</p>`;
+  }
+
+  async function analyzeVisualLocation() {
+    if (!currentFile || !currentReport) return;
+    const button = document.getElementById("aiLocationBtn");
+    const output = document.getElementById("aiLocationResult");
+    if (!button || !output) return;
+    button.disabled = true;
+    button.textContent = "PREPARING PRIVATE COPY…";
+    output.hidden = false;
+    output.className = "ai-location-result is-loading";
+    output.textContent = "Creating a smaller JPEG and removing the original metadata…";
+    try {
+      const image = await prepareAiImage(currentFile);
+      button.textContent = "ANALYZING VISIBLE CLUES…";
+      output.textContent = "The reduced copy is being analyzed. This can take up to a minute…";
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 75000);
+      let response;
+      try { response = await fetch(AI_ENDPOINT, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ image }), signal: controller.signal }); }
+      finally { clearTimeout(timeoutId); }
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || "Visual analysis is unavailable.");
+      if (!payload.result) throw new Error("The AI service returned no location result.");
+      currentReport.visualLocation = payload.result;
+      renderAiLocationResult(payload.result);
+      button.textContent = "ANALYZE AGAIN";
+    } catch (error) {
+      output.hidden = false;
+      output.className = "ai-location-result is-error";
+      output.textContent = error?.name === "AbortError" ? "The visual analysis timed out. Please try again." : (error instanceof Error ? error.message : "Visual analysis failed. Please try again.");
+      button.textContent = "TRY VISUAL ANALYSIS AGAIN";
+    } finally { button.disabled = false; }
+  }
+
   function showState(name, message = "") {
     els.empty.hidden = name !== "empty";
     els.loading.hidden = name !== "loading";
@@ -642,11 +733,13 @@
       if (currentObjectUrl) URL.revokeObjectURL(currentObjectUrl);
       currentObjectUrl = URL.createObjectURL(file);
       currentReport = await analyzePhoto(file);
+      currentFile = file;
       renderReport(currentReport);
       showState("result");
       if (window.matchMedia("(max-width: 1050px)").matches) document.getElementById("reportPanel").scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (error) {
       currentReport = null;
+      currentFile = null;
       if (currentObjectUrl) { URL.revokeObjectURL(currentObjectUrl); currentObjectUrl = null; }
       showState("error", error instanceof Error ? error.message : "Try another photo file.");
     }
@@ -654,6 +747,7 @@
 
   function clearReport() {
     currentReport = null;
+    currentFile = null;
     if (currentObjectUrl) URL.revokeObjectURL(currentObjectUrl);
     currentObjectUrl = null;
     els.fileInput.value = "";
@@ -678,6 +772,16 @@
       "",
       "Note: Metadata is a clue, not proof. It can be removed or changed."
     ];
+    if (report.visualLocation) {
+      const ai = report.visualLocation;
+      lines.splice(lines.length - 2, 0, "", "AI VISUAL LOCATION ESTIMATE",
+        `Likely area: ${[ai.likelyPlace, ai.region, ai.country].filter(Boolean).join(", ") || "Unable to estimate"}`,
+        `Confidence: ${ai.confidence || "unknown"}`,
+        `Summary: ${ai.summary || "Unavailable"}`,
+        `Visible clues: ${Array.isArray(ai.clues) && ai.clues.length ? ai.clues.join("; ") : "None found"}`,
+        `Limitation: ${ai.limitations || "Visual geolocation may be wrong."}`
+      );
+    }
     return lines.join("\n");
   }
 
