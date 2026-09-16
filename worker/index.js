@@ -31,17 +31,18 @@ function parseModelJson(value) {
 }
 
 function normalizeResult(value) {
+  const canEstimate = value?.canEstimate === true;
   const confidence = ["high", "medium", "low", "none"].includes(value?.confidence)
     ? value.confidence
     : "low";
   return {
-    canEstimate: Boolean(value?.canEstimate),
-    likelyPlace: String(value?.likelyPlace || "Unable to estimate"),
+    canEstimate,
+    likelyPlace: canEstimate ? String(value?.likelyPlace || "Unable to estimate") : "Unable to estimate",
     region: String(value?.region || ""),
     country: String(value?.country || ""),
-    confidence,
+    confidence: canEstimate ? confidence : "none",
     summary: String(value?.summary || "There are not enough reliable visual clues."),
-    mapQuery: String(value?.mapQuery || ""),
+    mapQuery: canEstimate ? String(value?.mapQuery || "") : "",
     clues: Array.isArray(value?.clues) ? value.clues.slice(0, 6).map(String) : [],
     alternatives: Array.isArray(value?.alternatives)
       ? value.alternatives.slice(0, 3).map((item) => ({
@@ -73,6 +74,11 @@ export default {
 
     if (origin !== ALLOWED_ORIGIN) {
       return json(origin, { error: "Origin not allowed." }, 403);
+    }
+
+    const rateLimit = await env.AI_RATE_LIMITER.limit({ key: "visual-location-global" });
+    if (!rateLimit.success) {
+      return json(origin, { error: "The AI service is busy. Please wait a minute and try again." }, 429);
     }
 
     const contentLength = Number(request.headers.get("Content-Length") || 0);
