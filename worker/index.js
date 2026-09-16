@@ -120,9 +120,14 @@ export default {
       const modelResponse = await env.AI.run("@cf/qwen/qwen3.8-27b", {
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt }
+          {
+            role: "user",
+            content: [
+              { type: "text", text: userPrompt },
+              { type: "image_url", image_url: { url: image } }
+            ]
+          }
         ],
-        image,
         max_completion_tokens: 700,
         temperature: 0.2,
         reasoning_effort: "medium",
