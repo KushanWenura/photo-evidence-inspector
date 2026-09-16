@@ -7,6 +7,13 @@
   "ai": {
     "binding": "AI"
   },
+  "ratelimits": [
+    {
+      "name": "AI_RATE_LIMITER",
+      "namespace_id": "20260916",
+      "simple": { "limit": 10, "period": 60 }
+    }
+  ],
   "observability": {
     "enabled": false
   }
