@@ -10,6 +10,13 @@
     reportActions: document.getElementById("reportActions"),
     empty: document.getElementById("emptyState"),
     loading: document.getElementById("loadingState"),
+    scanFileName: document.getElementById("scanFileName"),
+    scanTitle: document.getElementById("scanTitle"),
+    scanStatus: document.getElementById("scanStatus"),
+    scanChecks: document.getElementById("scanChecks"),
+    scanProgress: document.getElementById("scanProgress"),
+    scanProgressFill: document.getElementById("scanProgressFill"),
+    skipScanBtn: document.getElementById("skipScanBtn"),
     error: document.getElementById("errorState"),
     errorMessage: document.getElementById("errorMessage"),
     result: document.getElementById("resultState"),
@@ -24,6 +31,8 @@
   let currentFile = null;
   let currentObjectUrl = null;
   let toastTimer = null;
+  let inspectionId = 0;
+  let scanAnimation = null;
 
   const tagNames = {
     0x010f: "Make",
@@ -728,21 +737,103 @@
     els.result.hidden = name !== "result";
     els.reportActions.hidden = name !== "result";
     if (message) els.errorMessage.textContent = message;
+    document.getElementById("reportPanel").setAttribute("aria-busy", String(name === "loading"));
+  }
+
+  function cancelScanAnimation() {
+    if (scanAnimation) scanAnimation.finish();
+    scanAnimation = null;
+    els.skipScanBtn.hidden = true;
+  }
+
+  function beginScan(file) {
+    els.result.classList.remove("is-revealing");
+    els.scanFileName.textContent = file.name;
+    els.scanTitle.textContent = "Reading photo evidence";
+    els.scanStatus.textContent = "Reading image structure, embedded tags and file fingerprint locally…";
+    els.scanProgress.setAttribute("aria-valuenow", "0");
+    els.scanProgressFill.style.width = "0%";
+    els.scanChecks.innerHTML = ["Image structure", "Embedded metadata", "Capture timestamp", "GPS coordinates", "Phone / camera identity", "Evidence report"].map((label) => `<li><span>···</span>${label}</li>`).join("");
+    els.skipScanBtn.hidden = true;
+    showState("loading");
+  }
+
+  function revealScanChecks(report) {
+    const checks = [
+      { text: `Image structure · ${report.image.format}`, found: true },
+      { text: `Embedded metadata · ${report.assessment.metadataFieldsFound} fields found`, found: report.assessment.metadataFieldsFound > 0 },
+      { text: `Capture timestamp · ${report.capture.dateDisplay ? "found" : "not embedded"}`, found: Boolean(report.capture.dateDisplay) },
+      { text: `GPS coordinates · ${report.location.hasCoordinates ? "found" : "not embedded"}`, found: report.location.hasCoordinates },
+      { text: `Phone / camera · ${report.capture.device || "not embedded"}`, found: Boolean(report.capture.device) },
+      { text: "Evidence report · ready to reveal", found: true }
+    ];
+    const rows = Array.from(els.scanChecks.children);
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    els.scanTitle.textContent = "Verifying the evidence";
+    els.scanStatus.textContent = "Revealing verified checks. Missing information stays marked as missing.";
+    return new Promise((resolve) => {
+      const timers = [];
+      let finished = false;
+      function updateCheck(index) {
+        const check = checks[index];
+        rows[index].className = `is-verified${check.found ? "" : " is-missing"}`;
+        rows[index].innerHTML = `<span>${check.found ? "[OK]" : "[--]"}</span>${escapeHtml(check.text)}`;
+        const progress = Math.round((index + 1) / checks.length * 100);
+        els.scanProgressFill.style.width = `${progress}%`;
+        els.scanProgress.setAttribute("aria-valuenow", String(progress));
+        if (index === checks.length - 1) {
+          els.scanTitle.textContent = "Inspection complete";
+          els.scanStatus.textContent = "Local checks complete. Opening your evidence report…";
+        }
+      }
+      const session = {
+        finish() {
+          if (finished) return;
+          finished = true;
+          timers.forEach(clearTimeout);
+          if (scanAnimation === session) scanAnimation = null;
+          els.skipScanBtn.hidden = true;
+          resolve();
+        }
+      };
+      scanAnimation = session;
+      if (reducedMotion) {
+        checks.forEach((_, index) => updateCheck(index));
+        session.finish();
+        return;
+      }
+      els.skipScanBtn.hidden = false;
+      checks.forEach((_, index) => timers.push(setTimeout(() => updateCheck(index), 180 + index * 330)));
+      timers.push(setTimeout(() => session.finish(), 2400));
+    });
   }
 
   async function handleFile(file) {
-    showState("loading");
+    const requestId = ++inspectionId;
+    cancelScanAnimation();
+    currentReport = null;
+    currentFile = null;
+    if (currentObjectUrl) URL.revokeObjectURL(currentObjectUrl);
+    currentObjectUrl = null;
+    beginScan(file);
     els.dropZone.classList.remove("is-dragging");
+    if (window.matchMedia("(max-width: 1050px)").matches) document.getElementById("reportPanel").scrollIntoView({ behavior: "smooth", block: "start" });
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     try {
-      if (currentObjectUrl) URL.revokeObjectURL(currentObjectUrl);
+      if (requestId !== inspectionId) return;
+      const report = await analyzePhoto(file);
+      if (requestId !== inspectionId) return;
+      await revealScanChecks(report);
+      if (requestId !== inspectionId) return;
       currentObjectUrl = URL.createObjectURL(file);
-      currentReport = await analyzePhoto(file);
+      currentReport = report;
       currentFile = file;
       renderReport(currentReport);
+      els.result.classList.add("is-revealing");
       showState("result");
-      if (window.matchMedia("(max-width: 1050px)").matches) document.getElementById("reportPanel").scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (error) {
+      if (requestId !== inspectionId) return;
+      cancelScanAnimation();
       currentReport = null;
       currentFile = null;
       if (currentObjectUrl) { URL.revokeObjectURL(currentObjectUrl); currentObjectUrl = null; }
@@ -751,12 +842,15 @@
   }
 
   function clearReport() {
+    inspectionId += 1;
+    cancelScanAnimation();
     currentReport = null;
     currentFile = null;
     if (currentObjectUrl) URL.revokeObjectURL(currentObjectUrl);
     currentObjectUrl = null;
     els.fileInput.value = "";
     els.result.innerHTML = "";
+    els.result.classList.remove("is-revealing");
     showState("empty");
   }
 
@@ -832,6 +926,7 @@
   els.copyBtn.addEventListener("click", copyReport);
   els.exportBtn.addEventListener("click", exportReport);
   els.tryAgainBtn.addEventListener("click", openPicker);
+  els.skipScanBtn.addEventListener("click", () => scanAnimation?.finish());
 
   ["dragenter", "dragover"].forEach((name) => els.dropZone.addEventListener(name, (event) => {
     event.preventDefault();
