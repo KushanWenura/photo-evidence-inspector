@@ -116,9 +116,22 @@
         </div>
 
         <div id="loadingState" class="loading-state" hidden>
-          <div class="loader" aria-hidden="true"><span></span><span></span><span></span></div>
-          <h3>Reading photo evidence</h3>
-          <p>Checking image structure and embedded metadata…</p>
+          <div class="scan-terminal">
+            <div class="terminal-header"><span class="terminal-lights" aria-hidden="true"><i></i><i></i><i></i></span><span>LOCAL EVIDENCE SCANNER</span><span class="terminal-live">LOCAL ONLY</span></div>
+            <div class="scan-visual" aria-hidden="true">
+              <div class="scan-code">4F 2A 90 11 EXIF 08 6C<br>01001101 10100110 00110100<br>GPS IFD 00 71 A4 2F 09<br>11010010 00101001 01011010<br>3B 07 XMP 88 14 20 E1<br>00110101 10001001 11000010<br>SHA 256 7A 04 12 BC 0F</div>
+              <div class="scan-reticle"><span></span><i></i><b>SCAN</b></div>
+              <div class="scan-sweep"></div>
+            </div>
+            <div class="terminal-body">
+              <p class="terminal-command"><span>&gt; inspect</span> <strong id="scanFileName"></strong><i aria-hidden="true">_</i></p>
+              <h3 id="scanTitle">Reading photo evidence</h3>
+              <p id="scanStatus" class="scan-status" role="status">Checking the selected file on your device…</p>
+              <ol id="scanChecks" class="scan-checks" aria-label="Verified inspection checks"></ol>
+              <div id="scanProgress" class="scan-progress" role="progressbar" aria-label="Inspection check display" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="scanProgressFill"></span></div>
+              <div class="terminal-footer"><span>NO NETWORK ACCESS · METADATA CHECK</span><button id="skipScanBtn" class="scan-skip" type="button" hidden>Skip animation →</button></div>
+            </div>
+          </div>
         </div>
 
         <div id="errorState" class="error-state" hidden>
